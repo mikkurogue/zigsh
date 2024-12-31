@@ -13,12 +13,16 @@ const Builtin = enum {
 };
 
 pub fn main() !u8 {
-    // REPL - main loop
-
-    var buffer: [1024]u8 = undefined;
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
+
+    try repl(allocator);
+
+    return 0;
+}
+
+fn repl(allocator: std.mem.Allocator) !void {
+    var buffer: [1024]u8 = undefined;
 
     while (true) {
         const path = try std.fs.cwd().realpathAlloc(allocator, ".");
@@ -36,8 +40,6 @@ pub fn main() !u8 {
             }
         }
     }
-
-    return 0;
 }
 
 fn handler(T: Builtin, args: []const u8) !void {
