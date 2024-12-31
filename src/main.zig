@@ -4,6 +4,7 @@ const stdin = std.io.getStdIn().reader();
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 
+/// Builtins for the commands that are common syscommands
 const Builtin = enum {
     exit,
     echo,
@@ -21,6 +22,8 @@ pub fn main() !u8 {
     return 0;
 }
 
+/// REPL function wrapper
+/// This is the main shell loop for the application
 fn repl(allocator: std.mem.Allocator) !void {
     var buffer: [1024]u8 = undefined;
 
@@ -42,7 +45,8 @@ fn repl(allocator: std.mem.Allocator) !void {
     }
 }
 
-fn handler(T: Builtin, args: []const u8) !void {
+/// Basic handler to handle input commands
+fn builtin_handler(T: Builtin, args: []const u8) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
@@ -58,6 +62,7 @@ fn handler(T: Builtin, args: []const u8) !void {
     }
 }
 
+/// Handle the cd command.
 fn handle_ch_dir(args: []const u8) !void {
     if (std.mem.eql(u8, args, "~") or std.mem.eql(u8, args, "$HOME")) {
         try handle_ch_home();
@@ -75,6 +80,7 @@ fn handle_ch_dir(args: []const u8) !void {
     }
 }
 
+/// Handle the cd command but for relative pathing
 fn handle_relative_ch_dir(args: []const u8) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
@@ -87,6 +93,7 @@ fn handle_relative_ch_dir(args: []const u8) !void {
     }
 }
 
+/// Handle the cd command to cd back to home dir
 fn handle_ch_home() !void {
     const home = std.posix.getenv("HOME") orelse unreachable;
     if (std.posix.chdir(home)) {} else |_| {
@@ -94,6 +101,8 @@ fn handle_ch_home() !void {
     }
 }
 
+/// check if a command is a builtin command in this shell - i think this is useless but
+/// lets keep it just for fun and stringToEnum reference for learning
 fn handle_type(args: []const u8) !void {
     const args_type = std.meta.stringToEnum(Builtin, args);
     if (args_type) |@"type"| {
@@ -103,6 +112,8 @@ fn handle_type(args: []const u8) !void {
     }
 }
 
+/// Handle user input
+/// If  command is not a built in, then execute a new process.
 fn handle_input(allocator: Allocator, input: []const u8) !void {
     assert(input.len != 0);
 
@@ -113,29 +124,37 @@ fn handle_input(allocator: Allocator, input: []const u8) !void {
     const shell_builtin = std.meta.stringToEnum(Builtin, cmd);
 
     if (shell_builtin) |built_in| {
-        try handler(built_in, args);
+        try builtin_handler(built_in, args);
     } else {
-        const path = try find_on_path(allocator, cmd);
-        if (path) |p| {
-            defer allocator.free(p);
-
-            var arg_arr = std.ArrayList([]const u8).init(std.heap.page_allocator);
-            defer arg_arr.deinit();
-
-            try arg_arr.append(p);
-
-            while (input_slices.next()) |arg| {
-                try arg_arr.append(arg);
-            }
-
-            var child = std.process.Child.init(arg_arr.items, std.heap.page_allocator);
-            _ = try child.spawnAndWait();
-        } else {
-            try stdout.print("{s}: command not found\n", .{cmd});
-        }
+        try spawn_command_process(allocator, cmd, &input_slices);
     }
 }
 
+/// Spawn the process for the inputted command.
+/// This spawns the not-builtins
+/// FIXME: the type for input_slices should not be `anytype` but whatever the type of std.mem.splitSequence is
+fn spawn_command_process(allocator: std.mem.Allocator, cmd: []const u8, input_slices: anytype) !void {
+    const path = try find_on_path(allocator, cmd);
+    if (path) |p| {
+        defer allocator.free(p);
+
+        var arg_arr = std.ArrayList([]const u8).init(std.heap.page_allocator);
+        defer arg_arr.deinit();
+
+        try arg_arr.append(p);
+
+        while (input_slices.next()) |arg| {
+            try arg_arr.append(arg);
+        }
+
+        var child = std.process.Child.init(arg_arr.items, std.heap.page_allocator);
+        _ = try child.spawnAndWait();
+    } else {
+        try stdout.print("{s}: command not found\n", .{cmd});
+    }
+}
+
+/// Find a command on the path, for instance something like "ls" or "cat"
 fn find_on_path(allocator: Allocator, name: []const u8) !?[]const u8 {
     const path = std.posix.getenv("PATH") orelse "";
 
