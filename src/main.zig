@@ -64,7 +64,7 @@ fn builtin_handler(T: Builtin, args: []const u8) !void {
 
 /// Handle the cd command.
 fn handle_ch_dir(args: []const u8) !void {
-    if (std.mem.eql(u8, args, "~") or std.mem.eql(u8, args, "$HOME")) {
+    if (std.mem.eql(u8, args, "~") or std.mem.eql(u8, args, "$HOME") or args.len == 0 or std.mem.eql(u8, args, " ")) {
         try handle_ch_home();
         return;
     }
