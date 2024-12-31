@@ -57,6 +57,14 @@ fn handler(T: Builtin, args: []const u8) !void {
 }
 
 fn handle_ch_dir(args: []const u8) !void {
+    if (std.mem.eql(u8, args, "~") or std.mem.eql(u8, args, "$HOME")) {
+        const home = std.posix.getenv("HOME") orelse unreachable;
+        if (std.posix.chdir(home)) {} else |_| {
+            try stdout.print("cd: no $HOME environment variable found\n", .{});
+        }
+        return;
+    }
+
     if (std.posix.chdir(args)) {} else |_| {
         try stdout.print("cd: {s}: No such file or directory\n", .{args});
     }
