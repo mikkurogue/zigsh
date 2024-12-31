@@ -60,8 +60,23 @@ fn handle_ch_dir(args: []const u8) !void {
     if (std.mem.eql(u8, args, "~") or std.mem.eql(u8, args, "$HOME")) {
         const home = std.posix.getenv("HOME") orelse unreachable;
         if (std.posix.chdir(home)) {} else |_| {
-            try stdout.print("cd: no $HOME environment variable found\n", .{});
+            return error.NoHomeEnvSet;
         }
+        return;
+    }
+
+    // handle relative paths
+    if (std.mem.startsWith(u8, args, "./") or std.mem.startsWith(u8, args, "../")) {
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        const allocator = gpa.allocator();
+
+        const cd_to = try std.fs.cwd().realpathAlloc(allocator, args);
+        defer allocator.free(cd_to);
+
+        if (std.posix.chdir(cd_to)) {} else |_| {
+            try stdout.print("cd: {s}: No such file or directory\n", .{cd_to});
+        }
+
         return;
     }
 
