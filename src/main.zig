@@ -69,8 +69,11 @@ fn handle_ch_dir(args: []const u8) !void {
         return;
     }
 
+    // TODO: Handle executing executables like shell scripts, .AppImage etc.
+    // Need to figure out best way to spawn a process from it
+
     // handle relative paths
-    if (std.mem.startsWith(u8, args, "./") or std.mem.startsWith(u8, args, "../")) {
+    if (std.mem.startsWith(u8, args, "../")) {
         try handle_relative_ch_dir(args);
         return;
     }
@@ -132,7 +135,6 @@ fn handle_input(allocator: Allocator, input: []const u8) !void {
 
 /// Spawn the process for the inputted command.
 /// This spawns the not-builtins
-/// FIXME: the type for input_slices should not be `anytype` but whatever the type of std.mem.splitSequence is
 fn spawn_command_process(allocator: std.mem.Allocator, cmd: []const u8, input_slices: anytype) !void {
     const path = try find_on_path(allocator, cmd);
     if (path) |p| {
