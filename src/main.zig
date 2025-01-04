@@ -69,10 +69,6 @@ fn handle_ch_dir(args: []const u8) !void {
         return;
     }
 
-    // TODO: Handle executing executables like shell scripts, .AppImage etc.
-    // Need to figure out best way to spawn a process from it
-    //
-
     // handle relative paths
     if (std.mem.startsWith(u8, args, "../")) {
         try handle_relative_ch_dir(args);
@@ -96,13 +92,6 @@ fn handle_relative_ch_dir(args: []const u8) !void {
         try stdout.print("cd: {s}: No such file or directory\n", .{cd_to});
     }
 }
-
-// fn handle_open_binary(cmd: []const u8, binary_name: []const u8) !void {
-//     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-//     const allocator = gpa.allocator();
-//
-//
-// }
 
 /// Handle the cd command to cd back to home dir
 fn handle_ch_home() !void {
