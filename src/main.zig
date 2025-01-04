@@ -71,6 +71,7 @@ fn handle_ch_dir(args: []const u8) !void {
 
     // TODO: Handle executing executables like shell scripts, .AppImage etc.
     // Need to figure out best way to spawn a process from it
+    //
 
     // handle relative paths
     if (std.mem.startsWith(u8, args, "../")) {
@@ -95,6 +96,13 @@ fn handle_relative_ch_dir(args: []const u8) !void {
         try stdout.print("cd: {s}: No such file or directory\n", .{cd_to});
     }
 }
+
+// fn handle_open_binary(cmd: []const u8, binary_name: []const u8) !void {
+//     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+//     const allocator = gpa.allocator();
+//
+//
+// }
 
 /// Handle the cd command to cd back to home dir
 fn handle_ch_home() !void {
@@ -137,6 +145,12 @@ fn handle_input(allocator: Allocator, input: []const u8) !void {
 /// This spawns the not-builtins
 fn spawn_command_process(allocator: std.mem.Allocator, cmd: []const u8, input_slices: anytype) !void {
     const path = try find_on_path(allocator, cmd);
+
+    if (std.mem.startsWith(u8, cmd, "./")) {
+        try exec_from_zigsh(cmd, input_slices);
+        return;
+    }
+
     if (path) |p| {
         defer allocator.free(p);
 
@@ -154,6 +168,27 @@ fn spawn_command_process(allocator: std.mem.Allocator, cmd: []const u8, input_sl
     } else {
         try stdout.print("{s}: command not found\n", .{cmd});
     }
+}
+
+/// exec a shell script for instance from zigsh!
+fn exec_from_zigsh(cmd: []const u8, input_slices: anytype) !void {
+    var arg_arr = std.ArrayList([]const u8).init(std.heap.page_allocator);
+    defer arg_arr.deinit();
+
+    try arg_arr.append(cmd);
+
+    while (input_slices.next()) |arg| {
+        try arg_arr.append(arg);
+    }
+
+    var child = std.process.Child.init(arg_arr.items, std.heap.page_allocator);
+    _ = child.spawnAndWait() catch |err| {
+        switch (err) {
+            error.PermissionDenied => try stdout.print("Error: Permission denied\n", .{}),
+            error.AccessDenied => try stdout.print("Error: Access denied\n", .{}),
+            else => {}, // for now lets not exhaust the switch i cba
+        }
+    };
 }
 
 /// Find a command on the path, for instance something like "ls" or "cat"
