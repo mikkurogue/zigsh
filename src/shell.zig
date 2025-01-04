@@ -1,5 +1,5 @@
 const std = @import("std");
-const Command = @import("command.zig");
+const Command = @import("command.zig").Command;
 const stdout = std.io.getStdOut().writer();
 const stdin = std.io.getStdIn().reader();
 const Allocator = std.mem.Allocator;
@@ -23,7 +23,7 @@ pub const Shell = struct {
             const path = try std.fs.cwd().realpathAlloc(self.allocator, ".");
             defer self.allocator.free(path);
 
-            var cmd_runner = try Command.Command.init(self.allocator, path);
+            var cmd_runner = try Command.init(self.allocator, path);
 
             try stdout.print("$ {s} ", .{path});
             if (try stdin.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
