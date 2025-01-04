@@ -5,7 +5,7 @@ const stdin = std.io.getStdIn().reader();
 const Allocator = std.mem.Allocator;
 const empty_config = .{};
 
-pub const Prompt = struct {
+pub const Shell = struct {
     allocator: Allocator,
 
     const Self = @This();

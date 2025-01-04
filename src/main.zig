@@ -2,16 +2,16 @@ const std = @import("std");
 const stdout = std.io.getStdOut().writer();
 const stdin = std.io.getStdIn().reader();
 const Allocator = std.mem.Allocator;
-const assert = std.debug.assert;
-const Prompt = @import("prompt.zig");
+const Shell = @import("shell.zig");
+const empty_config = .{};
 
 pub fn main() !u8 {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.GeneralPurposeAllocator(empty_config){};
     const allocator = gpa.allocator();
 
-    var prompt = try Prompt.Prompt.init(allocator);
+    var sh = try Shell.Shell.init(allocator);
 
-    try prompt.prompt();
+    try sh.prompt();
 
     return 0;
 }
