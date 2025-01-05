@@ -149,16 +149,16 @@ pub const Command = struct {
             try stdout.print("cd: {s}: No such file or directory\n", .{cd_to});
         }
     }
-
-    fn handle_type(args: []const u8) !void {
-        const args_type = std.meta.stringToEnum(Builtin, args);
-        if (args_type) |@"type"| {
-            try stdout.print("{s} is a shell builtin\n", .{@tagName(@"type")});
-        } else {
-            try stdout.print("{s}: not found\n", .{args});
-        }
-    }
 };
+
+fn handle_type(args: []const u8) !void {
+    const args_type = std.meta.stringToEnum(Builtin, args);
+    if (args_type) |@"type"| {
+        try stdout.print("{s} is a shell builtin\n", .{@tagName(@"type")});
+    } else {
+        try stdout.print("{s}: not found\n", .{args});
+    }
+}
 
 fn find_on_path(allocator: Allocator, name: []const u8) !?[]const u8 {
     const path = std.posix.getenv("PATH") orelse "";
