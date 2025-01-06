@@ -38,7 +38,7 @@ pub const Shell = struct {
             defer self.allocator.free(display_path);
             var cmd_runner = try Command.init(self.allocator, path);
 
-            try stdout.print("{s}{s}@{s}: {s}{s}{s} ", .{ blue, hostname, usr, green, display_path, clear_color });
+            try stdout.print("{s}{s}@{s}: {s}{s}{s} > ", .{ blue, hostname, usr, green, display_path, clear_color });
             if (try stdin.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
                 const cmd = line;
                 if (cmd.len != 0) {
