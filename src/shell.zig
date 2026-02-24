@@ -1,9 +1,7 @@
 const std = @import("std");
 const Command = @import("command.zig").Command;
-const stdout = std.io.getStdOut().writer();
-const stdin = std.io.getStdIn().reader();
+
 const Allocator = std.mem.Allocator;
-const empty_config = .{};
 
 pub const Shell = struct {
     allocator: Allocator,
@@ -17,11 +15,16 @@ pub const Shell = struct {
     }
 
     pub fn prompt(self: *Self) !void {
-        var buffer: [1024]u8 = undefined;
         var hostname_buffer: [64]u8 = undefined;
 
-        const usr = std.posix.getenv("USER") orelse unreachable;
+        // Buffers for the new Writer/Reader API
+        var stdout_buffer: [4096]u8 = undefined;
+        var stdin_buffer: [4096]u8 = undefined;
 
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+
+        const usr = std.posix.getenv("USER") orelse unreachable;
         const hostname = try std.posix.gethostname(&hostname_buffer);
 
         while (true) {
@@ -31,22 +34,35 @@ pub const Shell = struct {
             const home = std.posix.getenv("HOME") orelse unreachable;
 
             var display_path: []const u8 = path;
+            var allocated_display_path = false;
             if (home.len > 0 and std.mem.startsWith(u8, path, home)) {
                 // slice off the home directory prefix and prepend "~" because it looks cooler
                 display_path = try std.mem.concat(self.allocator, u8, &[_][]const u8{ "~", path[home.len..] });
+                allocated_display_path = true;
             }
-            defer self.allocator.free(display_path);
+            defer if (allocated_display_path) self.allocator.free(display_path);
+
             var cmd_runner = try Command.init(self.allocator, path);
 
-            try stdout.print("{s}{s}@{s}: {s}{s}{s} > ", .{ blue, usr, hostname, green, display_path, clear_color });
-            if (try stdin.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
-                const cmd = line;
-                if (cmd.len != 0) {
-                    // run the command
-                    try cmd_runner.run(cmd);
-                } else {
-                    try stdout.print("\n", empty_config);
-                }
+            try stdout_writer.interface.print("{s}{s}@{s}: {s}{s}{s} > ", .{ blue, usr, hostname, green, display_path, clear_color });
+            try stdout_writer.interface.flush();
+
+            // Read a line using the new Reader API
+            // takeDelimiterExclusive returns the line without the newline character
+            // but does NOT consume the delimiter, so we need to toss it manually
+            const line = stdin_reader.interface.takeDelimiterExclusive('\n') catch |err| switch (err) {
+                error.EndOfStream => break, // EOF, exit the shell
+                else => |e| return e,
+            };
+            // Skip past the newline delimiter
+            stdin_reader.interface.toss(1);
+
+            if (line.len != 0) {
+                // run the command
+                try cmd_runner.run(line);
+            } else {
+                try stdout_writer.interface.print("\n", .{});
+                try stdout_writer.interface.flush();
             }
         }
     }

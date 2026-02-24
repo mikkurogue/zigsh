@@ -1,12 +1,9 @@
 const std = @import("std");
-const stdout = std.io.getStdOut().writer();
 const posix = std.posix;
 const Allocator = std.mem.Allocator;
 const fs = std.fs;
 const Dir = fs.Dir;
 const assert = std.debug.assert;
-
-const empty_config = .{};
 
 const Builtin = enum {
     exit,
@@ -19,6 +16,7 @@ const Builtin = enum {
 pub const Command = struct {
     allocator: Allocator,
     path: []u8,
+    stdout_buffer: [4096]u8 = undefined,
 
     const Self = @This();
 
@@ -27,6 +25,10 @@ pub const Command = struct {
             .allocator = allocator,
             .path = path,
         };
+    }
+
+    fn getStdoutWriter(self: *Self) std.fs.File.Writer {
+        return std.fs.File.stdout().writer(&self.stdout_buffer);
     }
 
     pub fn run(self: *Self, cmd: []const u8) !void {
@@ -46,9 +48,9 @@ pub const Command = struct {
         const shell_builtin = std.meta.stringToEnum(Builtin, cmd);
 
         if (shell_builtin) |built_in| {
-            try builtin_handler(self, built_in, args);
+            try self.builtin_handler(built_in, args);
         } else {
-            try spawn_command_process(self, cmd, &input_slices);
+            try self.spawn_command_process(cmd, &input_slices);
         }
     }
 
@@ -63,40 +65,40 @@ pub const Command = struct {
 
         if (path) |p| {
             defer self.allocator.free(p);
-            // TODO: replace this with ArraylistUnmanaged
-            var arg_arr = std.ArrayList([]const u8).init(std.heap.page_allocator);
-            defer arg_arr.deinit();
+            // Use the new ArrayList API - initialize with empty and pass allocator to methods
+            var arg_arr: std.ArrayList([]const u8) = .empty;
+            defer arg_arr.deinit(self.allocator);
 
             // First argument should be the path that we want to go to
-            try arg_arr.append(p);
+            try arg_arr.append(self.allocator, p);
 
             // now append the rest of the arguments
             var slices = input_slices.*;
             while (slices.next()) |arg| {
-                try arg_arr.append(arg);
+                try arg_arr.append(self.allocator, arg);
             }
 
-            var child = std.process.Child.init(arg_arr.items, std.heap.page_allocator);
+            var child = std.process.Child.init(arg_arr.items, self.allocator);
             _ = try child.spawnAndWait();
         } else {
-            try stdout.print("{s}: Command not found\n", .{cmd});
+            var stdout_writer = self.getStdoutWriter();
+            try stdout_writer.interface.print("{s}: Command not found\n", .{cmd});
+            try stdout_writer.interface.flush();
         }
     }
 
     fn exec_from_zigsh(self: *Self, cmd: []const u8, input_slices: *const std.mem.SplitIterator(u8, .sequence)) !void {
-        _ = self;
-        // TODO: replace this with ArraylistUnmanaged
-        var arg_arr = std.ArrayList([]const u8).init(std.heap.page_allocator);
-        defer arg_arr.deinit();
+        var arg_arr: std.ArrayList([]const u8) = .empty;
+        defer arg_arr.deinit(self.allocator);
 
-        try arg_arr.append(cmd);
+        try arg_arr.append(self.allocator, cmd);
 
         var slices = input_slices.*;
         while (slices.next()) |arg| {
-            try arg_arr.append(arg);
+            try arg_arr.append(self.allocator, arg);
         }
 
-        var child = std.process.Child.init(arg_arr.items, std.heap.page_allocator);
+        var child = std.process.Child.init(arg_arr.items, self.allocator);
         _ = try child.spawnAndWait();
     }
 
@@ -107,13 +109,32 @@ pub const Command = struct {
         const path = try fs.cwd().realpathAlloc(self.allocator, ".");
         defer self.allocator.free(path);
 
+        var stdout_writer = self.getStdoutWriter();
+
         switch (T) {
             Builtin.exit => std.process.exit(0),
-            Builtin.echo => try stdout.print("{s}\n", .{args}),
-            Builtin.type => try handle_type(args),
-            Builtin.pwd => try stdout.print("{s}\n", .{path}),
-            Builtin.cd => try handle_ch_dir(self, args),
+            Builtin.echo => {
+                try stdout_writer.interface.print("{s}\n", .{args});
+                try stdout_writer.interface.flush();
+            },
+            Builtin.type => try self.handle_type(args),
+            Builtin.pwd => {
+                try stdout_writer.interface.print("{s}\n", .{path});
+                try stdout_writer.interface.flush();
+            },
+            Builtin.cd => try self.handle_ch_dir(args),
         }
+    }
+
+    fn handle_type(self: *Self, args: []const u8) !void {
+        var stdout_writer = self.getStdoutWriter();
+        const args_type = std.meta.stringToEnum(Builtin, args);
+        if (args_type) |t| {
+            try stdout_writer.interface.print("{s} is a shell builtin\n", .{@tagName(t)});
+        } else {
+            try stdout_writer.interface.print("{s}: not found\n", .{args});
+        }
+        try stdout_writer.interface.flush();
     }
 
     fn handle_ch_dir(self: *Self, args: []const u8) !void {
@@ -129,7 +150,9 @@ pub const Command = struct {
         }
 
         if (std.posix.chdir(args)) {} else |_| {
-            try stdout.print("cd: {s}: No such file or directory\n", .{args});
+            var stdout_writer = self.getStdoutWriter();
+            try stdout_writer.interface.print("cd: {s}: No such file or directory\n", .{args});
+            try stdout_writer.interface.flush();
         }
     }
 
@@ -146,19 +169,12 @@ pub const Command = struct {
         defer self.allocator.free(cd_to);
 
         if (posix.chdir(cd_to)) {} else |_| {
-            try stdout.print("cd: {s}: No such file or directory\n", .{cd_to});
+            var stdout_writer = self.getStdoutWriter();
+            try stdout_writer.interface.print("cd: {s}: No such file or directory\n", .{cd_to});
+            try stdout_writer.interface.flush();
         }
     }
 };
-
-fn handle_type(args: []const u8) !void {
-    const args_type = std.meta.stringToEnum(Builtin, args);
-    if (args_type) |@"type"| {
-        try stdout.print("{s} is a shell builtin\n", .{@tagName(@"type")});
-    } else {
-        try stdout.print("{s}: not found\n", .{args});
-    }
-}
 
 fn find_on_path(allocator: Allocator, name: []const u8) !?[]const u8 {
     const path = std.posix.getenv("PATH") orelse "";
