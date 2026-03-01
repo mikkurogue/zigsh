@@ -15,6 +15,9 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    // Dependencies
+    const toml_mod = b.dependency("toml", .{}).module("toml");
+
     // const lib = b.addStaticLibrary(.{
     //     .name = "zigsh",
     //     // In this case the main source file is merely a path, however, in more
@@ -31,9 +34,14 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "zigsh",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "toml", .module = toml_mod },
+            },
+        }),
     });
 
     // This declares intent for the executable to be installed into the
@@ -75,9 +83,14 @@ pub fn build(b: *std.Build) void {
     // const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "toml", .module = toml_mod },
+            },
+        }),
     });
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
