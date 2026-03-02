@@ -20,7 +20,6 @@ pub const Shell = struct {
 
     pub fn prompt(self: *Self) !void {
         var shell_prompt = Prompt.init(self.allocator, self.cfg);
-
         try shell_prompt.draw_prompt();
     }
 };

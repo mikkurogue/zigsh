@@ -1,8 +1,10 @@
 const std = @import("std");
 const toml = @import("toml");
+const tracing = @import("tracing");
 
 pub const Config = struct {
     sys_icon: ?[]const u8 = null,
+    sys_icon_color: ?[]const u8 = null,
     user_color: []const u8,
     host_color: []const u8,
     path_color: []const u8,
@@ -28,14 +30,15 @@ pub fn load_config(allocator: std.mem.Allocator) !Config {
     var parser = toml.Parser(Config).init(allocator);
     defer parser.deinit();
 
-    var result = parser.parseString(content) catch |err| {
-        std.debug.print("Could not parse config file: {any}\n", .{err});
+    var result = parser.parseString(content) catch {
+        tracing.warn("could not parse config from path", @src());
         return default_config();
     };
     defer result.deinit();
 
     const cfg = Config{
         .sys_icon = if (result.value.sys_icon) |icon| try allocator.dupe(u8, icon) else null,
+        .sys_icon_color = if (result.value.sys_icon_color) |icon_color| try allocator.dupe(u8, icon_color) else null,
         .user_color = try allocator.dupe(u8, result.value.user_color),
         .host_color = try allocator.dupe(u8, result.value.host_color),
         .path_color = try allocator.dupe(u8, result.value.path_color),
@@ -44,7 +47,7 @@ pub fn load_config(allocator: std.mem.Allocator) !Config {
         .show_toolchain = result.value.show_toolchain,
     };
 
-    std.debug.print("Loaded config: {any}\n", .{cfg});
+    tracing.info("config loaded", @src());
 
     return cfg;
 }
@@ -57,6 +60,7 @@ fn get_config_path(allocator: std.mem.Allocator) ![]const u8 {
 fn default_config() Config {
     return Config{
         .sys_icon = null,
+        .sys_icon_color = null,
         .user_color = "#5555ff",
         .host_color = "#5555ff",
         .path_color = "#55ff55",

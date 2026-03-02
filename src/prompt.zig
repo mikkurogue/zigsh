@@ -6,8 +6,11 @@ const Color = @import("./lib/color.zig");
 
 pub const Prompt = struct {
     const Self = @This();
+
     allocator: Allocator,
+
     sys_icon: ?[]const u8,
+    sys_icon_color: ?Color.Color,
     user_color: Color.Color,
     path_color: Color.Color,
     prompt_icon: []const u8,
@@ -17,6 +20,7 @@ pub const Prompt = struct {
         return .{
             .allocator = allocator,
             .sys_icon = cfg.sys_icon,
+            .sys_icon_color = if (cfg.sys_icon_color) |icon_color| Color.Color.parse(icon_color) orelse .{ .named = .white } else null,
             .user_color = Color.Color.parse(cfg.user_color) orelse .{ .named = .blue },
             .path_color = Color.Color.parse(cfg.path_color) orelse .{ .named = .green },
             .prompt_icon = cfg.prompt_icon,
@@ -35,6 +39,9 @@ pub const Prompt = struct {
         var user_color_buf: [32]u8 = undefined;
         var path_color_buf: [32]u8 = undefined;
         var prompt_color_buf: [32]u8 = undefined;
+        var sys_icon_color_buf: [32]u8 = undefined;
+
+        const sys_icon_ansi = if (self.sys_icon_color) |icon_color| icon_color.toAnsi(&sys_icon_color_buf) else null;
 
         const user_ansi = self.user_color.toAnsi(&user_color_buf);
         const path_ansi = self.path_color.toAnsi(&path_color_buf);
@@ -64,6 +71,10 @@ pub const Prompt = struct {
             var cmd_runner = try Command.init(self.allocator, path);
 
             // Print sys_icon at the beginning if set
+            if (self.sys_icon_color) |_| {
+                try stdout_writer.interface.print("{s}", .{sys_icon_ansi orelse ""});
+            }
+
             if (self.sys_icon) |icon| {
                 try stdout_writer.interface.print("{s} ", .{icon});
             }

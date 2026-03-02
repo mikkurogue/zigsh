@@ -25,6 +25,10 @@
             .url = "git+https://github.com/sam701/zig-toml#cf50bd59c6276fb2b6d34b8d71d35486eecc719c",
             .hash = "toml-0.3.0-bV14Bd-EAQBKoXhpYft303BtA2vgLNlxntUCIWgRUl46",
         },
+        .tracing = .{
+            .url = "git+https://github.com/mikkurogue/tracing-zig#7e023c5bdc2e3b7b538b936afa78ef0774b9dedc",
+            .hash = "tracing-0.0.1-_Kd37RItAABn8qc5k351nLG3KLdbbD_y9BOVLb2tiOJH",
+        },
     },
     .paths = .{
         "build.zig",

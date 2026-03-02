@@ -17,6 +17,7 @@ pub fn build(b: *std.Build) void {
 
     // Dependencies
     const toml_mod = b.dependency("toml", .{}).module("toml");
+    const tracing = b.dependency("tracing", .{}).module("tracing");
 
     const exe_mod = b.addModule("zigsh", .{
         .root_source_file = b.path("src/main.zig"),
@@ -24,6 +25,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "toml", .module = toml_mod },
+            .{ .name = "tracing", .module = tracing },
         },
     });
 

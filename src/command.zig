@@ -58,7 +58,6 @@ pub const Command = struct {
         const path = try find_on_path(self.allocator, cmd);
 
         if (std.mem.startsWith(u8, cmd, "./")) {
-            // TODO: Implement exec_from_zigsh(cmd, input_slices); method
             try self.exec_from_zigsh(cmd, input_slices);
             return;
         }
